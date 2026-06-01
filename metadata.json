@@ -1,0 +1,6 @@
+{
+  "name": "City Master",
+  "description": "An MVC-structured City Master application to search, sort, paginate, add, and edit cities, strictly adhering to the Interface-Repository-Controller pattern.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
