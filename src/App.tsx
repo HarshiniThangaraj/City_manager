@@ -25,7 +25,13 @@ import {
   SlidersHorizontal,
   PlusCircle,
   TrendingUp,
-  Cpu
+  Cpu,
+  Shield,
+  Lock,
+  Unlock,
+  LogIn,
+  LogOut,
+  Key
 } from 'lucide-react';
 import { City, CityFormData, CityListResponse, ApiResponse } from './types';
 
@@ -70,6 +76,55 @@ export default function App() {
   });
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editingCityId, setEditingCityId] = useState<string | null>(null);
+
+  // Authentication states (separate Admin and User)
+  const [userRole, setUserRole] = useState<'admin' | 'user' | null>(() => {
+    return (localStorage.getItem('city_master_role') as 'admin' | 'user' | null) || null;
+  });
+  const [authUsername, setAuthUsername] = useState<string>('');
+  const [authPassword, setAuthPassword] = useState<string>('');
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  const handleQuickLogin = (role: 'admin' | 'user') => {
+    if (role === 'admin') {
+      setAuthUsername('admin');
+      setAuthPassword('admin123');
+    } else {
+      setAuthUsername('user');
+      setAuthPassword('user123');
+    }
+    setAuthError(null);
+  };
+
+  const handleLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+    const u = authUsername.trim().toLowerCase();
+    const p = authPassword;
+
+    if (u === 'admin' && p === 'admin123') {
+      setUserRole('admin');
+      localStorage.setItem('city_master_role', 'admin');
+      showNotification('Signed in successfully as Administrator (Read/Write access)!', 'success');
+      setAuthUsername('');
+      setAuthPassword('');
+    } else if (u === 'user' && p === 'user123') {
+      setUserRole('user');
+      localStorage.setItem('city_master_role', 'user');
+      showNotification('Signed in successfully as Standard User (Read Only access)!', 'success');
+      setAuthUsername('');
+      setAuthPassword('');
+    } else {
+      setAuthError('Invalid credentials. Hint: admin/admin123 or user/user123');
+    }
+  };
+
+  const handleLogout = () => {
+    setUserRole(null);
+    localStorage.removeItem('city_master_role');
+    showNotification('Logged out successfully. Read/write access restricted.', 'success');
+    resetForm();
+  };
 
   // Debounce search input to avoid hitting database on every keystroke
   useEffect(() => {
@@ -338,571 +393,701 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Container */}
-      <div className="w-full max-w-7xl mx-auto flex-1 flex flex-col gap-6">
-        
-        {/* Top Header Section */}
-        <header id="app-header" className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-slate-200 gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse"></span>
-              <h1 className="text-xl md:text-2xl font-extrabold text-slate-950 tracking-tight font-display">City Master Console</h1>
-            </div>
-            <p className="text-xs text-slate-500 font-mono mt-1">
-              <span className="text-indigo-600 font-semibold">ICityRepository</span> • MVC Architecture Pattern • REST API
-            </p>
-          </div>
-          <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
-            <div className="flex flex-col items-start sm:items-end">
-              <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                Active Service
-              </span>
-              <span className="text-[10px] text-slate-400 font-mono mt-1">ApiResponseDTO • camelCase</span>
-            </div>
-            <div className="w-11 h-11 rounded-full bg-indigo-600 flex items-center justify-center text-white font-black text-sm shadow-md border-2 border-white shadow-indigo-100">
-              CM
-            </div>
-          </div>
-        </header>
-
-        {/* Bento Grid Layout */}
-        <div id="bento-grid" className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
-          {/* LEFT COLUMN: Manage City Form (4 cols on lg and up) */}
-          <section id="form-card" className="lg:col-span-4 bg-white rounded-3xl p-6 shadow-sm border border-slate-200 flex flex-col min-h-[580px] hover:border-slate-300 transition-all">
-            <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
-                  isEditing ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'
-                }`}>
-                  {isEditing ? <Edit2 className="w-4.5 h-4.5" /> : <Plus className="w-5 h-5" />}
-                </div>
-                <div>
-                  <h2 className="font-extrabold text-slate-900 leading-tight font-display text-base">
-                    {isEditing ? 'Edit City Record' : 'Create City Record'}
-                  </h2>
-                  <p className="text-[11px] text-slate-400">Save details into Firestore DB</p>
-                </div>
+      {userRole === null ? (
+        /* GORGEOUS LOGIN SCREEN - SHOWN ONLY ON WORKSPACE START */
+        <div className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-3xl border border-slate-200 shadow-xl">
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-650 text-indigo-600 mb-4 shadow-sm animate-pulse">
+                <Lock className="w-8 h-8 text-indigo-600" />
               </div>
-              {isEditing && (
-                <button 
-                  id="cancel-edit-btn"
-                  onClick={resetForm}
-                  className="text-xs font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors px-2 py-1 rounded-lg flex items-center gap-1"
-                >
-                  <X className="w-3.5 h-3.5" /> Cancel
-                </button>
-              )}
+              <h2 className="text-2xl font-extrabold text-slate-950 font-display tracking-tight">
+                City Master Console
+              </h2>
+              <p className="text-xs text-slate-500 mt-2">
+                Sign in using standard user or administrator credentials
+              </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4 flex-1">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                  <span>City Name *</span>
-                  <span className="text-[10px] text-slate-400 capitalize font-mono">Case-insensitive check</span>
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3.5 top-3 text-slate-400">
-                    <Building2 className="w-4 h-4" />
-                  </span>
-                  <input 
-                    id="input-name"
-                    type="text" 
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    placeholder="e.g. San Francisco" 
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-all text-slate-900 font-medium"
+            <form onSubmit={handleLoginSubmit} className="mt-8 space-y-5">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                    Username
+                  </label>
+                  <input
+                    id="login-username"
+                    name="username"
+                    type="text"
                     required
+                    value={authUsername}
+                    onChange={(e) => { setAuthUsername(e.target.value); setAuthError(null); }}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-all text-slate-900 font-medium placeholder:text-slate-400"
+                    placeholder="Enter 'admin' or 'user'"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                    Password
+                  </label>
+                  <input
+                    id="login-password"
+                    name="password"
+                    type="password"
+                    required
+                    value={authPassword}
+                    onChange={(e) => { setAuthPassword(e.target.value); setAuthError(null); }}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-all text-slate-900 font-medium font-mono placeholder:text-slate-400"
+                    placeholder="••••••••"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Country / Code *</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-3 text-slate-400">
-                      <Globe className="w-3.5 h-3.5" />
-                    </span>
-                    <input 
-                      id="input-country"
-                      type="text" 
-                      name="country"
-                      value={formData.country}
-                      onChange={handleInputChange}
-                      placeholder="e.g. United States" 
-                      className="w-full pl-8 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-all text-slate-900 text-xs font-medium"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">State / Province</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-3 text-slate-400">
-                      <MapPin className="w-3.5 h-3.5" />
-                    </span>
-                    <input 
-                      id="input-state"
-                      type="text" 
-                      name="stateProvince"
-                      value={formData.stateProvince}
-                      onChange={handleInputChange}
-                      placeholder="e.g. California" 
-                      className="w-full pl-8 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-all text-slate-900 text-xs font-medium"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Population Count</label>
-                <div className="relative">
-                  <span className="absolute left-3.5 top-3 text-slate-400">
-                    <Users className="w-4 h-4" />
-                  </span>
-                  <input 
-                    id="input-population"
-                    type="number" 
-                    name="population"
-                    value={formData.population === 0 ? '' : formData.population}
-                    onChange={handleInputChange}
-                    placeholder="e.g. 883000" 
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-all text-slate-900 font-mono text-xs"
-                    min="0"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Short Description</label>
-                <textarea 
-                  id="input-description"
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  placeholder="Summarize key city details, landmarks or climate..." 
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-xs transition-all text-slate-900 h-24 resize-none"
-                />
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
-                <div>
-                  <span className="text-xs font-bold text-slate-700 block">Record Status</span>
-                  <span className="text-[10px] text-slate-400 block">Status controls public visibility</span>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input 
-                    id="input-isactive"
-                    type="checkbox" 
-                    name="isActive" 
-                    checked={formData.isActive}
-                    onChange={handleInputChange}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                  <span className="ml-2 text-xs font-bold text-slate-600 w-12 text-right">
-                    {formData.isActive ? 'Active' : 'Inactive'}
-                  </span>
-                </label>
-              </div>
-
-              {errorInputMsg && (
-                <div id="validation-error-box" className="p-3.5 bg-rose-50 border border-rose-100 text-rose-800 rounded-xl text-xs font-medium flex items-start gap-2.5">
-                  <AlertCircle className="w-4 h-4 text-rose-650 shrink-0 mt-0.5" />
+              {authError && (
+                <div id="login-error-box" className="p-3 bg-rose-50 border border-rose-100 text-rose-805 text-rose-800 rounded-xl text-xs font-medium flex items-start gap-2.5 animate-shake">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-bold">Error:</span> {errorInputMsg}
+                    <span className="font-bold">Error:</span> {authError}
                   </div>
                 </div>
               )}
 
-              <button 
-                id="save-record-btn"
+              <button
                 type="submit"
-                className={`w-full text-white font-extrabold py-3 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 ${
-                  isEditing 
-                    ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-100' 
-                    : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'
-                }`}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 rounded-xl text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer"
               >
-                {isEditing ? (
-                  <>
-                    <Edit2 className="w-4 h-4" /> Save Changes
-                  </>
-                ) : (
-                  <>
-                    <PlusCircle className="w-4 h-4" /> Add New Record
-                  </>
-                )}
+                <LogIn className="w-4 h-4" />
+                <span>Sign in to Console</span>
               </button>
             </form>
 
-            <div className="mt-6 p-4 bg-indigo-50 rounded-2xl border border-indigo-100 flex gap-3 text-indigo-800">
-              <Info className="w-4 h-4 shrink-0 mt-0.5" />
-              <p className="text-[10px] sm:text-[11px] font-medium leading-relaxed">
-                <span className="font-bold">Architecture Rule:</span> Save maps to <code>CreateCityDto</code> and <code>UpdateCityDto</code> parameters through <code>CityController</code>.
+            <div className="pt-6 border-t border-slate-100">
+              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block text-center mb-3">
+                Preconfigured Role Presets
+              </span>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  id="prefill-admin-btn"
+                  onClick={() => handleQuickLogin('admin')}
+                  className="flex flex-col items-center justify-center p-3.5 bg-slate-50 hover:bg-amber-50/70 border border-slate-200 rounded-xl transition-all cursor-pointer group text-left w-full"
+                >
+                  <Shield className="w-5 h-5 text-amber-500 group-hover:scale-110 transition-transform mb-1.5" />
+                  <span className="font-extrabold text-slate-800 text-xs block text-center">Administrator</span>
+                  <span className="text-[9px] text-slate-400 block text-center mt-1 font-mono">admin / admin123</span>
+                </button>
+                <button
+                  id="prefill-user-btn"
+                  onClick={() => handleQuickLogin('user')}
+                  className="flex flex-col items-center justify-center p-3.5 bg-slate-50 hover:bg-indigo-50/70 border border-slate-200 rounded-xl transition-all cursor-pointer group text-left w-full"
+                >
+                  <Users className="w-5 h-5 text-indigo-500 group-hover:scale-110 transition-transform mb-1.5" />
+                  <span className="font-extrabold text-slate-800 text-xs block text-center">Standard User</span>
+                  <span className="text-[9px] text-slate-400 block text-center mt-1 font-mono">user / user123</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* CORE APPLICATION - RENDERED ONLY WHEN LOGGED IN */
+        <div className="w-full max-w-7xl mx-auto flex-1 flex flex-col gap-6 animate-fade-in">
+          
+          {/* Top Header Section with Sign Out */}
+          <header id="app-header" className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-slate-200 gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse"></span>
+                <h1 className="text-xl md:text-2xl font-extrabold text-slate-950 tracking-tight font-display">City Master Console</h1>
+              </div>
+              <p className="text-xs text-slate-500 font-mono mt-1">
+                <span className="text-indigo-600 font-semibold">ICityRepository</span> • MVC Architecture Pattern • REST API
               </p>
             </div>
-          </section>
+            <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
+              <div className="flex flex-col items-start sm:items-end">
+                <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  Active Service
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono mt-1">
+                  {userRole === 'admin' ? 'Role: Administrator (R/W)' : 'Role: Standard User (R-O)'}
+                </span>
+              </div>
+              <div className={`w-11 h-11 rounded-full flex items-center justify-center text-white font-black text-xs shadow-md border-2 border-white transition-all duration-300 ${
+                userRole === 'admin' ? 'bg-amber-600 shadow-amber-100 animate-pulse' : 'bg-indigo-600 shadow-indigo-100'
+              }`}>
+                {userRole === 'admin' ? 'ADM' : 'USR'}
+              </div>
+              
+              <button
+                id="header-sign-out-btn"
+                onClick={handleLogout}
+                className="px-3.5 py-2 hover:bg-rose-50 text-slate-650 hover:text-rose-605 text-slate-600 hover:text-rose-600 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 border border-slate-200 hover:border-rose-200 cursor-pointer shadow-sm hover:shadow"
+                title="Sign out of Console"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Sign Out</span>
+              </button>
+            </div>
+          </header>
 
-          {/* RIGHT COLUMN: Bento Stats Grid + App Data Grid (8 cols on lg and up) */}
-          <div className="lg:col-span-8 flex flex-col gap-6 w-full">
+          {/* Bento Grid Layout */}
+          <div id="bento-grid" className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             
-            {/* Bento Quick Stats Grid (4 Metrics Rows) */}
-            <section id="stats-section" className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              
-              <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between hover:scale-[1.02] transition-transform">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Records</span>
-                  <div className="w-6 h-6 rounded bg-slate-100 text-slate-600 flex items-center justify-center">
-                    <DatabaseIcon className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <span className="text-2xl font-extrabold text-slate-900 tracking-tight font-display">{stats.totalCount}</span>
-                  <span className="text-[10px] text-slate-400 block mt-0.5">Cities in repository</span>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between hover:scale-[1.02] transition-transform">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active State</span>
-                  <div className="w-6 h-6 rounded bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                    <CheckCircle className="w-3.5 h-3.5 animate-pulse" />
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <span className="text-2xl font-extrabold text-emerald-600 tracking-tight font-display">{stats.activeCount}</span>
-                  <span className="text-[10px] text-slate-400 block mt-0.5">Cities searchable live</span>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between hover:scale-[1.02] transition-transform">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Population</span>
-                  <div className="w-6 h-6 rounded bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                    <Users className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <span className="text-base font-bold text-slate-800 truncate block mt-1.5 font-mono">
-                    {formatNumber(stats.totalPopulation)}
-                  </span>
-                  <span className="text-[10px] text-slate-400 block">Total estimated residents</span>
-                </div>
-              </div>
-
-              <div className="bg-indigo-600 rounded-2xl p-4 border border-indigo-700 shadow-sm flex flex-col justify-between hover:scale-[1.02] transition-transform text-white">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-indigo-200 uppercase tracking-wider">Largest City</span>
-                  <div className="w-6 h-6 rounded bg-indigo-500/50 text-indigo-100 flex items-center justify-center">
-                    <TrendingUp className="w-3.5 h-3.5 animate-bounce" />
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <span className="text-base font-extrabold text-white tracking-tight truncate block mt-1">
-                    {stats.mostPopulatedCity}
-                  </span>
-                  <span className="text-[10px] text-indigo-200 block">Highest population in DB</span>
-                </div>
-              </div>
-
-            </section>
-
-            {/* City List Table (Bento Card) */}
-            <section id="list-card" className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 flex flex-col min-h-[500px] hover:border-slate-300 transition-all">
-              
-              {/* Filter Controls Row */}
-              <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 mb-6 pb-4 border-b border-slate-100">
-                {/* Search */}
-                <div className="relative flex-1">
-                  <span className="absolute left-3.5 top-3 text-slate-400">
-                    <Search className="w-4 h-4" />
-                  </span>
-                  <input 
-                    id="search-input"
-                    type="text" 
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search name, country or state..." 
-                    className="w-full pl-10 pr-10 py-2 bg-slate-50 hover:bg-slate-100/70 border border-slate-200 rounded-full text-xs outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 transition-all placeholder:text-slate-400 font-medium"
-                  />
-                  {search && (
-                    <button 
-                      id="clear-search-btn"
-                      onClick={() => setSearch('')}
-                      className="absolute right-3.5 top-2.5 text-slate-400 hover:text-slate-600 transition-colors"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Sort, Refresh & Limit selector */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex items-center gap-1.5 text-xs text-slate-500 font-bold bg-slate-100 px-3 py-2 rounded-full border border-slate-200">
-                    <SlidersHorizontal className="w-3.5 h-3.5" />
-                    <span>Sort By:</span>
-                    <select 
-                      id="sort-select"
-                      value={sortBy} 
-                      onChange={(e) => { setSortBy(e.target.value); setPage(1); }}
-                      className="bg-transparent border-none outline-none text-indigo-700 cursor-pointer font-extrabold focus:ring-0 py-0 pl-1 pr-4"
-                    >
-                      <option value="name">City Name</option>
-                      <option value="country">Country</option>
-                      <option value="stateProvince">State/Region</option>
-                      <option value="population">Population</option>
-                      <option value="createdAt">Date Created</option>
-                    </select>
-                  </div>
-
-                  <button 
-                    id="order-direction-btn"
-                    onClick={() => setOrder(o => o === 'asc' ? 'desc' : 'asc')}
-                    className="p-2 sm:px-3 text-xs bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold rounded-full border border-slate-200 transition-colors flex items-center justify-center gap-1"
-                    title={`Change sorting order. Currently ${order === 'asc' ? 'Ascending' : 'Descending'}`}
-                  >
-                    <span>{order === 'asc' ? '▲ ASC' : '▼ DESC'}</span>
-                  </button>
-
-                  <select 
-                    id="limit-select"
-                    value={limit} 
-                    onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
-                    className="px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-bold rounded-full border border-slate-200 outline-none transition-colors cursor-pointer"
-                    title="Items per page"
-                  >
-                    <option value="5">5 / Page</option>
-                    <option value="10">10 / Page</option>
-                    <option value="20">20 / Page</option>
-                  </select>
-
-                  <button 
-                    id="refresh-btn"
-                    onClick={fetchCities}
-                    className="p-2 bg-slate-50 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 rounded-full border border-slate-200 transition-all flex items-center justify-center absolute sm:static right-6"
-                    title="Reload Data"
-                  >
-                    <RotateCcw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Data Table Area */}
-              <div className="flex-1 overflow-x-auto">
-                {isLoading ? (
-                  <div className="h-64 flex flex-col items-center justify-center gap-3 text-slate-400">
-                    <Activity className="w-8 h-8 text-indigo-500 animate-pulse" />
-                    <span className="text-xs font-semibold animate-pulse font-mono">Querying database via UnitOfWork...</span>
-                  </div>
-                ) : cities.length === 0 ? (
-                  <div className="h-64 flex flex-col items-center justify-center gap-2 text-slate-405 text-center">
-                    <DatabaseIcon className="w-10 h-10 text-slate-300" />
-                    <h3 className="font-bold text-slate-800 text-sm font-display">No matching cities found</h3>
-                    <p className="text-xs text-slate-400 max-w-xs mt-1">There are no records representing your keyword filter criteria. Insert a new record to seed.</p>
-                    {(search || debouncedSearch) && (
+            {/* LEFT COLUMN: Manage City Form or User Role Details */}
+            <section id="form-card" className="lg:col-span-4 bg-white rounded-3xl p-6 shadow-sm border border-slate-200 flex flex-col min-h-[580px] hover:border-slate-300 transition-all">
+              {userRole === 'admin' ? (
+                <>
+                  <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
+                        isEditing ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'
+                      }`}>
+                        {isEditing ? <Edit2 className="w-4.5 h-4.5" /> : <Plus className="w-5 h-5" />}
+                      </div>
+                      <div>
+                        <h2 className="font-extrabold text-slate-900 leading-tight font-display text-base col-heading">
+                          {isEditing ? 'Edit City Record' : 'Create City Record'}
+                        </h2>
+                        <p className="text-[11px] text-slate-400">Save details into Firestore DB</p>
+                      </div>
+                    </div>
+                    {isEditing && (
                       <button 
-                        id="reset-search-btn"
-                        onClick={() => { setSearch(''); setPage(1); }}
-                        className="mt-3 text-xs font-bold text-indigo-600 bg-indigo-50/50 hover:bg-indigo-50 px-3 py-1.5 rounded-full border border-indigo-100 transition-colors"
+                        id="cancel-edit-btn"
+                        onClick={resetForm}
+                        className="text-xs font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors px-2 py-1 rounded-lg flex items-center gap-1"
                       >
-                        Reset Search Filter
+                        <X className="w-3.5 h-3.5" /> Cancel
                       </button>
                     )}
                   </div>
-                ) : (
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                        <th className="pb-3 pl-4">ID</th>
-                        <th className="pb-3 text-slate-700">City Name</th>
-                        <th className="pb-3 text-slate-700">Country</th>
-                        <th className="pb-3 text-slate-700">State / Province</th>
-                        <th className="pb-3 text-slate-700">Population</th>
-                        <th className="pb-3 text-slate-700 text-center">Status</th>
-                        <th className="pb-3 pr-4 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-xs">
-                      {cities.map((city) => (
-                        <tr 
-                          key={city.id} 
-                          className={`border-b border-slate-50 hover:bg-slate-50/80 transition-colors group ${
-                            editingCityId === city.id ? 'bg-amber-50/40 border-amber-100' : ''
+
+                  <form onSubmit={handleSubmit} className="space-y-4 flex-1">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                        <span>City Name *</span>
+                        <span className="text-[10px] text-slate-400 capitalize font-mono">Case-insensitive check</span>
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-3 text-slate-400">
+                          <Building2 className="w-4 h-4" />
+                        </span>
+                        <input 
+                          id="input-name"
+                          type="text" 
+                          name="name"
+                          value={formData.name}
+                          onChange={handleInputChange}
+                          placeholder="e.g. San Francisco" 
+                          className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-all text-slate-900 font-medium"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Country / Code *</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-3 text-slate-400">
+                            <Globe className="w-3.5 h-3.5" />
+                          </span>
+                          <input 
+                            id="input-country"
+                            type="text" 
+                            name="country"
+                            value={formData.country}
+                            onChange={handleInputChange}
+                            placeholder="e.g. United States" 
+                            className="w-full pl-8 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-all text-slate-900 text-xs font-medium"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">State / Province</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-3 text-slate-400">
+                            <MapPin className="w-3.5 h-3.5" />
+                          </span>
+                          <input 
+                            id="input-state"
+                            type="text" 
+                            name="stateProvince"
+                            value={formData.stateProvince}
+                            onChange={handleInputChange}
+                            placeholder="e.g. California" 
+                            className="w-full pl-8 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-all text-slate-900 text-xs font-medium"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Population Count</label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-3 text-slate-400">
+                          <Users className="w-4 h-4" />
+                        </span>
+                        <input 
+                          id="input-population"
+                          type="number" 
+                          name="population"
+                          value={formData.population === 0 ? '' : formData.population}
+                          onChange={handleInputChange}
+                          placeholder="e.g. 883000" 
+                          className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-all text-slate-900 font-mono text-xs"
+                          min="0"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Short Description</label>
+                      <textarea 
+                        id="input-description"
+                        name="description"
+                        value={formData.description}
+                        onChange={handleInputChange}
+                        placeholder="Summarize key city details, landmarks or climate..." 
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-xs transition-all text-slate-900 h-24 resize-none"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                      <div>
+                        <span className="text-xs font-bold text-slate-700 block">Record Status</span>
+                        <span className="text-[10px] text-slate-400 block">Status controls public visibility</span>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                          id="input-isactive"
+                          type="checkbox" 
+                          name="isActive" 
+                          checked={formData.isActive}
+                          onChange={handleInputChange}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                        <span className="ml-2 text-xs font-bold text-slate-600 w-12 text-right">
+                          {formData.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </label>
+                    </div>
+
+                    {errorInputMsg && (
+                      <div id="validation-error-box" className="p-3.5 bg-rose-50 border border-rose-100 text-rose-800 rounded-xl text-xs font-medium flex items-start gap-2.5">
+                        <AlertCircle className="w-4 h-4 text-rose-655 text-rose-600 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-bold">Error:</span> {errorInputMsg}
+                        </div>
+                      </div>
+                    )}
+
+                    <button 
+                      id="save-record-btn"
+                      type="submit"
+                      className={`w-full text-white font-extrabold py-3 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 ${
+                        isEditing 
+                          ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-100' 
+                          : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'
+                      }`}
+                    >
+                      {isEditing ? (
+                        <>
+                          <Edit2 className="w-4 h-4" /> Save Changes
+                        </>
+                      ) : (
+                        <>
+                          <PlusCircle className="w-4 h-4" /> Add New Record
+                        </>
+                      )}
+                    </button>
+                  </form>
+
+                  <div className="mt-6 p-4 bg-indigo-50 rounded-2xl border border-indigo-100 flex gap-3 text-indigo-805 text-indigo-800">
+                    <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                    <p className="text-[10px] sm:text-[11px] font-medium leading-relaxed">
+                      <span className="font-bold">Architecture Rule:</span> Save maps to <code>CreateCityDto</code> and <code>UpdateCityDto</code> parameters through <code>CityController</code>.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                /* Standard User Mode - Read Only Panel */
+                <div className="flex flex-col h-full justify-between flex-1">
+                  <div>
+                    <div className="text-center py-6 border-b border-slate-100">
+                      <div className="w-14 h-14 mx-auto rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mb-3 shadow-sm">
+                        <Shield className="w-7 h-7 text-indigo-600" />
+                      </div>
+                      <h2 className="font-extrabold text-slate-900 font-display text-base tracking-tight">Standard User Mode</h2>
+                      <p className="text-[11px] text-slate-500 mt-1 max-w-xs mx-auto">
+                        Logged in as read-only. Search, query, and paginated actions are fully authorized.
+                      </p>
+                    </div>
+
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3 my-4 text-slate-700">
+                      <h3 className="font-extrabold text-[10px] uppercase text-slate-400 tracking-wider">Separate Role Privileges</h3>
+                      <ul className="space-y-2 text-xs">
+                        <li className="flex items-center gap-2 text-emerald-805 text-emerald-800 font-medium">
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                          <span>Search city index entries</span>
+                        </li>
+                        <li className="flex items-center gap-2 text-emerald-805 text-emerald-800 font-medium">
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                          <span>Perform sorting & pagination</span>
+                        </li>
+                        <li className="flex items-center gap-2 text-slate-400">
+                          <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="line-through">Create city parameters</span>
+                        </li>
+                        <li className="flex items-center gap-2 text-slate-400">
+                          <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="line-through">Modify/delete repository records</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="mt-auto">
+                    <div className="text-[11px] text-slate-600 bg-amber-50 border border-amber-200 p-3.5 rounded-xl flex gap-2 mb-3 leading-relaxed">
+                      <Lock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold text-amber-850 text-amber-800">Admin Clearance Needed:</span> Login as administrator to add, tweak, or drop cities from the record list.
+                      </div>
+                    </div>
+                    
+                    <button
+                      id="elevate-role-btn"
+                      onClick={() => {
+                        setUserRole('admin');
+                        localStorage.setItem('city_master_role', 'admin');
+                        showNotification('Elevated successfully as Administrator (R/W)!', 'success');
+                      }}
+                      className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-xl transition-all text-xs flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                    >
+                      <Unlock className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>Elevate Session to Admin</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {/* RIGHT COLUMN: Bento Stats Grid + App Data Grid */}
+            <div className="lg:col-span-8 flex flex-col gap-6 w-full">
+              
+              {/* Bento Quick Stats Grid (4 Metrics Rows) */}
+              <section id="stats-section" className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                
+                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between hover:scale-[1.02] transition-transform">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Records</span>
+                    <div className="w-6 h-6 rounded bg-slate-100 text-slate-600 flex items-center justify-center">
+                      <DatabaseIcon className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <span className="text-2xl font-extrabold text-slate-900 tracking-tight font-display">{stats.totalCount}</span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5">Cities in repository</span>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between hover:scale-[1.02] transition-transform">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active State</span>
+                    <div className="w-6 h-6 rounded bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                      <CheckCircle className="w-3.5 h-3.5 animate-pulse" />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <span className="text-2xl font-extrabold text-emerald-600 tracking-tight font-display">{stats.activeCount}</span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5">Cities searchable live</span>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between hover:scale-[1.02] transition-transform">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Population</span>
+                    <div className="w-6 h-6 rounded bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                      <Users className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <span className="text-base font-bold text-slate-800 truncate block mt-1.5 font-mono">
+                      {formatNumber(stats.totalPopulation)}
+                    </span>
+                    <span className="text-[10px] text-slate-400 block">Total estimated residents</span>
+                  </div>
+                </div>
+
+                <div className="bg-indigo-600 rounded-2xl p-4 border border-indigo-700 shadow-sm flex flex-col justify-between hover:scale-[1.02] transition-transform text-white">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-indigo-200 uppercase tracking-wider">Largest City</span>
+                    <div className="w-6 h-6 rounded bg-indigo-500/50 text-indigo-100 flex items-center justify-center">
+                      <TrendingUp className="w-3.5 h-3.5 animate-bounce" />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <span className="text-base font-extrabold text-white tracking-tight truncate block mt-1">
+                      {stats.mostPopulatedCity}
+                    </span>
+                    <span className="text-[10px] text-indigo-200 block">Highest population in DB</span>
+                  </div>
+                </div>
+
+              </section>
+
+              {/* City List Table (Bento Card) */}
+              <section id="list-card" className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 flex flex-col min-h-[500px] hover:border-slate-300 transition-all">
+                
+                {/* Filter Controls Row */}
+                <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 mb-6 pb-4 border-b border-slate-100">
+                  {/* Search */}
+                  <div className="relative flex-1">
+                    <span className="absolute left-3.5 top-3 text-slate-400">
+                      <Search className="w-4 h-4" />
+                    </span>
+                    <input 
+                      id="search-input"
+                      type="text" 
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Search name, country or state..." 
+                      className="w-full pl-10 pr-10 py-2 bg-slate-50 hover:bg-slate-100/70 border border-slate-200 rounded-full text-xs outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 transition-all placeholder:text-slate-400 font-medium"
+                    />
+                    {search && (
+                      <button 
+                        id="clear-search-btn"
+                        onClick={() => setSearch('')}
+                        className="absolute right-3.5 top-2.5 text-slate-400 hover:text-slate-600 transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Sort, Refresh & Limit selector */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500 font-bold bg-slate-100 px-3 py-2 rounded-full border border-slate-200">
+                      <SlidersHorizontal className="w-3.5 h-3.5" />
+                      <span>Sort By:</span>
+                      <select 
+                        id="sort-select"
+                        value={sortBy} 
+                        onChange={(e) => { setSortBy(e.target.value); setPage(1); }}
+                        className="bg-transparent border-none outline-none text-indigo-700 cursor-pointer font-extrabold focus:ring-0 py-0 pl-1 pr-4 text-xs"
+                      >
+                        <option value="name">City Name</option>
+                        <option value="country">Country</option>
+                        <option value="stateProvince">State/Region</option>
+                        <option value="population">Population</option>
+                        <option value="createdAt">Date Created</option>
+                      </select>
+                    </div>
+
+                    <button 
+                      id="order-direction-btn"
+                      onClick={() => setOrder(o => o === 'asc' ? 'desc' : 'asc')}
+                      className="p-2 sm:px-3 text-xs bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold rounded-full border border-slate-200 transition-colors flex items-center justify-center gap-1"
+                      title={`Change sorting order. Currently ${order === 'asc' ? 'Ascending' : 'Descending'}`}
+                    >
+                      <span>{order === 'asc' ? '▲ ASC' : '▼ DESC'}</span>
+                    </button>
+
+                    <select 
+                      id="limit-select"
+                      value={limit} 
+                      onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                      className="px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-bold rounded-full border border-slate-200 outline-none transition-colors cursor-pointer"
+                      title="Items per page"
+                    >
+                      <option value="5">5 / Page</option>
+                      <option value="10">10 / Page</option>
+                      <option value="20">20 / Page</option>
+                    </select>
+
+                    <button 
+                      id="refresh-btn"
+                      onClick={fetchCities}
+                      className="p-2 bg-slate-50 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 rounded-full border border-slate-200 transition-all flex items-center justify-center"
+                      title="Reload Data"
+                    >
+                      <RotateCcw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Data Table Area */}
+                <div className="flex-1 overflow-x-auto">
+                  {isLoading ? (
+                    <div className="h-64 flex flex-col items-center justify-center gap-3 text-slate-400">
+                      <Activity className="w-8 h-8 text-indigo-500 animate-pulse" />
+                      <span className="text-xs font-semibold animate-pulse font-mono">Querying database via UnitOfWork...</span>
+                    </div>
+                  ) : cities.length === 0 ? (
+                    <div className="h-64 flex flex-col items-center justify-center gap-2 text-slate-400 text-center">
+                      <DatabaseIcon className="w-10 h-10 text-slate-300" />
+                      <h3 className="font-bold text-slate-800 text-sm font-display">No matching cities found</h3>
+                      <p className="text-xs text-slate-400 max-w-xs mt-1">There are no records representing your keyword filter criteria. Insert a new record to seed.</p>
+                      {(search || debouncedSearch) && (
+                        <button 
+                          id="reset-search-btn"
+                          onClick={() => { setSearch(''); setPage(1); }}
+                          className="mt-3 text-xs font-bold text-indigo-600 bg-indigo-50/50 hover:bg-indigo-50 px-3 py-1.5 rounded-full border border-indigo-100 transition-colors"
+                        >
+                          Reset Search Filter
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                          <th className="pb-3 pl-4">ID</th>
+                          <th className="pb-3 text-slate-700">City Name</th>
+                          <th className="pb-3 text-slate-700">Country</th>
+                          <th className="pb-3 text-slate-700">State / Province</th>
+                          <th className="pb-3 text-slate-700">Population</th>
+                          <th className="pb-3 text-slate-700 text-center">Status</th>
+                          <th className="pb-3 pr-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-xs">
+                        {cities.map((city) => (
+                           <tr 
+                            key={city.id} 
+                            className={`border-b border-slate-50 hover:bg-slate-50/85 transition-colors group ${
+                              editingCityId === city.id ? 'bg-amber-50/40 border-amber-100' : ''
+                            }`}
+                          >
+                            <td className="py-3.5 pl-4 font-mono text-[10px] text-slate-400">
+                              #{city.id.slice(-4)}
+                            </td>
+                            <td className="py-3.5">
+                              <div className="font-extrabold text-slate-900 text-sm font-display flex items-center gap-1.5">
+                                {city.name}
+                                {editingCityId === city.id && (
+                                  <span className="text-[9px] bg-amber-100 text-amber-800 px-1 py-0.5 rounded font-mono font-bold uppercase scale-90">
+                                    EDITING
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-slate-400 mt-0.5 max-w-xs truncate group-hover:text-slate-600" title={city.description}>
+                                {city.description || 'No description provided.'}
+                              </div>
+                            </td>
+                            <td className="py-3.5 font-semibold text-slate-700">
+                              {city.country}
+                            </td>
+                            <td className="py-3.5 text-slate-600">
+                              {city.stateProvince || <span className="text-slate-300">—</span>}
+                            </td>
+                            <td className="py-3.5 font-mono text-slate-700 font-medium">
+                              {city.population > 0 ? formatNumber(city.population) : <span className="text-slate-300 font-sans">0</span>}
+                            </td>
+                            <td className="py-3.5 text-center">
+                              <span className={`px-2.5 py-1 text-[10px] rounded-full font-extrabold uppercase ${
+                                city.isActive 
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
+                                  : 'bg-slate-100 text-slate-500 border border-slate-150'
+                              }`}>
+                                {city.isActive ? 'Active' : 'Inactive'}
+                              </span>
+                            </td>
+                            <td className="py-3.5 pr-4 text-right">
+                              {userRole === 'admin' ? (
+                                <div className="flex items-center justify-end gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
+                                  <button 
+                                    id={`edit-city-btn-${city.id}`}
+                                    onClick={() => handleEditClick(city)}
+                                    className="p-1.5 text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-all"
+                                    title="Edit Record"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button 
+                                    id={`delete-city-btn-${city.id}`}
+                                    onClick={() => handleDeleteClick(city.id, city.name)}
+                                    className="p-1.5 text-slate-500 hover:text-rose-605 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                    title="Delete Record"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="inline-flex items-center gap-1.5 text-slate-400 bg-slate-50/60 px-2.5 py-1 rounded-lg border border-slate-200/50 text-[10px] font-mono select-none" title="Admin permissions required to modify entries.">
+                                  <Lock className="w-3 h-3 text-slate-400" />
+                                  <span>Locked</span>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                {/* Dynamic Pagination Controls */}
+                <div className="flex flex-col sm:flex-row justify-between items-center pt-5 mt-4 border-t border-slate-100 gap-4">
+                  <span className="text-xs text-slate-400 font-medium font-mono">
+                    Showing <span className="font-bold text-slate-700">{cities.length > 0 ? (page - 1) * limit + 1 : 0}</span> to{' '}
+                    <span className="font-bold text-slate-700">{Math.min(page * limit, total)}</span> of{' '}
+                    <span className="font-bold text-slate-700">{total}</span> total cities
+                  </span>
+                  
+                  {totalPages > 1 && (
+                    <div className="flex items-center gap-1">
+                      <button 
+                        id="prev-page-btn"
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                        disabled={page === 1}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-500 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed transition-colors cursor-pointer"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                        <button
+                          key={p}
+                          id={`page-btn-${p}`}
+                          onClick={() => setPage(p)}
+                          className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            page === p
+                              ? 'bg-indigo-600 text-white shadow shadow-indigo-100'
+                              : 'bg-white hover:bg-slate-50 border border-slate-200 text-slate-600'
                           }`}
                         >
-                          <td className="py-3.5 pl-4 font-mono text-[10px] text-slate-400">
-                            #{city.id.slice(-4)}
-                          </td>
-                          <td className="py-3.5">
-                            <div className="font-extrabold text-slate-900 text-sm font-display flex items-center gap-1.5">
-                              {city.name}
-                              {editingCityId === city.id && (
-                                <span className="text-[9px] bg-amber-100 text-amber-800 px-1 py-0.5 rounded font-mono font-bold uppercase scale-90">
-                                  EDITING
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[10px] text-slate-400 mt-0.5 max-w-xs truncate group-hover:text-slate-650" title={city.description}>
-                              {city.description || 'No description provided.'}
-                            </div>
-                          </td>
-                          <td className="py-3.5 font-semibold text-slate-700">
-                            {city.country}
-                          </td>
-                          <td className="py-3.5 text-slate-600">
-                            {city.stateProvince || <span className="text-slate-300">—</span>}
-                          </td>
-                          <td className="py-3.5 font-mono text-slate-700 font-medium">
-                            {city.population > 0 ? formatNumber(city.population) : <span className="text-slate-300 font-sans">0</span>}
-                          </td>
-                          <td className="py-3.5 text-center">
-                            <span className={`px-2.5 py-1 text-[10px] rounded-full font-extrabold uppercase ${
-                              city.isActive 
-                                ? 'bg-emerald-55 bg-emerald-50 text-emerald-700 border border-emerald-100' 
-                                : 'bg-slate-100 text-slate-500 border border-slate-150'
-                            }`}>
-                              {city.isActive ? 'Active' : 'Inactive'}
-                            </span>
-                          </td>
-                          <td className="py-3.5 pr-4 text-right">
-                            <div className="flex items-center justify-end gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
-                              <button 
-                                id={`edit-city-btn-${city.id}`}
-                                onClick={() => handleEditClick(city)}
-                                className="p-1.5 text-slate-500 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-all"
-                                title="Edit Record"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </button>
-                              <button 
-                                id={`delete-city-btn-${city.id}`}
-                                onClick={() => handleDeleteClick(city.id, city.name)}
-                                className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                                title="Delete Record"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
+                          {p}
+                        </button>
                       ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
 
-              {/* Dynamic Pagination Controls */}
-              <div className="flex flex-col sm:flex-row justify-between items-center pt-5 mt-4 border-t border-slate-100 gap-4">
-                <span className="text-xs text-slate-400 font-medium">
-                  Showing <span className="font-bold text-slate-700">{cities.length > 0 ? (page - 1) * limit + 1 : 0}</span> to{' '}
-                  <span className="font-bold text-slate-700">{Math.min(page * limit, total)}</span> of{' '}
-                  <span className="font-bold text-slate-700">{total}</span> total cities
-                </span>
-                
-                {totalPages > 1 && (
-                  <div className="flex items-center gap-1">
-                    <button 
-                      id="prev-page-btn"
-                      onClick={() => setPage(p => Math.max(1, p - 1))}
-                      disabled={page === 1}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-500 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed transition-colors"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                      <button
-                        key={p}
-                        id={`page-btn-${p}`}
-                        onClick={() => setPage(p)}
-                        className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all ${
-                          page === p
-                            ? 'bg-indigo-600 text-white shadow shadow-indigo-100'
-                            : 'bg-white hover:bg-slate-50 border border-slate-200 text-slate-600'
-                        }`}
+                      <button 
+                        id="next-page-btn"
+                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                        disabled={page === totalPages}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-500 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed transition-colors cursor-pointer"
                       >
-                        {p}
+                        <ChevronRight className="w-4 h-4" />
                       </button>
-                    ))}
-
-                    <button 
-                      id="next-page-btn"
-                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                      disabled={page === totalPages}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-500 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed transition-colors"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-              </div>
-
-            </section>
-
-            {/* Architectural Flow Status Indicators Card (Bento Card in Dark Theme) */}
-            <section id="architecture-card" className="bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-800 text-white">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-indigo-400">
-                    <Cpu className="w-4.5 h-4.5" />
-                  </div>
-                  <div>
-                    <h2 className="text-white font-extrabold text-sm tracking-tight font-display">MVC Layer Status</h2>
-                    <p className="text-[10px] text-slate-400">Strict System Compliance Check</p>
-                  </div>
-                </div>
-                <span className="px-2.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-mono font-bold tracking-wider">
-                  SYNCED
-                </span>
-              </div>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
-                <div className="flex items-center gap-2.5 bg-slate-800/40 p-2.5 rounded-xl border border-slate-800/60">
-                  <div className="w-2 h-2 rounded-full referee bg-emerald-400 animate-pulse"></div>
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Core Interface</span>
-                    <span className="text-xs font-mono text-slate-250 mt-0.5">ICityRepository</span>
-                  </div>
+                    </div>
+                  )}
                 </div>
 
-                <div className="flex items-center gap-2.5 bg-slate-800/40 p-2.5 rounded-xl border border-slate-800/60">
-                  <div className="w-2 h-2 rounded-full referee bg-emerald-400"></div>
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Single Projection</span>
-                    <span className="text-xs font-mono text-slate-250 mt-0.5">No duplicate queries</span>
-                  </div>
-                </div>
+              </section>
 
-                <div className="flex items-center gap-2.5 bg-slate-800/40 p-2.5 rounded-xl border border-slate-800/60">
-                  <div className="w-2 h-2 rounded-full referee bg-emerald-400"></div>
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Encapsulation</span>
-                    <span className="text-xs font-mono text-slate-250 mt-0.5">ApiResponseDTO Wrapper</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2.5 bg-slate-800/40 p-2.5 rounded-xl border border-slate-800/60">
-                  <div className="w-2 h-2 rounded-full referee bg-emerald-400"></div>
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Dependency Inject</span>
-                    <span className="text-xs font-mono text-slate-250 mt-0.5">Via construction constructor</span>
-                  </div>
-                </div>
-              </div>
-            </section>
+            </div>
 
           </div>
 
         </div>
+      )}
 
-      </div>
-
-      {/* Outer humble footer without cluttered tags */}
+      {/* Outer elegant footer without cluttered tags */}
       <footer id="app-footer" className="mt-8 text-center text-[11px] text-slate-400 font-medium">
         <p>City Master Console &bull; Connected to database repository securely with transaction status monitoring.</p>
       </footer>
