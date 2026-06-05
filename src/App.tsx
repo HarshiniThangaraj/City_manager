@@ -31,7 +31,8 @@ import {
   Unlock,
   LogIn,
   LogOut,
-  Key
+  Key,
+  UserPlus
 } from 'lucide-react';
 import { City, CityFormData, CityListResponse, ApiResponse } from './types';
 
@@ -85,6 +86,31 @@ export default function App() {
   const [authPassword, setAuthPassword] = useState<string>('');
   const [authError, setAuthError] = useState<string | null>(null);
 
+  // Registration & User Storage States
+  const [isRegistering, setIsRegistering] = useState<boolean>(false);
+  const [regUsername, setRegUsername] = useState<string>('');
+  const [regPassword, setRegPassword] = useState<string>('');
+  const [regConfirmPassword, setRegConfirmPassword] = useState<string>('');
+  const [regRole, setRegRole] = useState<'admin' | 'user'>('user');
+  const [regError, setRegError] = useState<string | null>(null);
+  const [regSuccess, setRegSuccess] = useState<string | null>(null);
+
+  // Load and store registered users locally (pre-filled with default preset credentials)
+  const [registeredUsers, setRegisteredUsers] = useState<{username: string; password: string; role: 'admin' | 'user'}[]>(() => {
+    const saved = localStorage.getItem('city_master_registered_users');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Error loading registered users', e);
+      }
+    }
+    return [
+      { username: 'admin', password: 'admin123', role: 'admin' },
+      { username: 'user', password: 'user123', role: 'user' }
+    ];
+  });
+
   const handleQuickLogin = (role: 'admin' | 'user') => {
     if (role === 'admin') {
       setAuthUsername('admin');
@@ -102,21 +128,82 @@ export default function App() {
     const u = authUsername.trim().toLowerCase();
     const p = authPassword;
 
-    if (u === 'admin' && p === 'admin123') {
-      setUserRole('admin');
-      localStorage.setItem('city_master_role', 'admin');
-      showNotification('Signed in successfully as Administrator (Read/Write access)!', 'success');
-      setAuthUsername('');
-      setAuthPassword('');
-    } else if (u === 'user' && p === 'user123') {
-      setUserRole('user');
-      localStorage.setItem('city_master_role', 'user');
-      showNotification('Signed in successfully as Standard User (Read Only access)!', 'success');
+    // Direct check against state-registered list (case-insensitive username matches)
+    const foundUser = registeredUsers.find(
+      user => user.username.trim().toLowerCase() === u && user.password === p
+    );
+
+    if (foundUser) {
+      setUserRole(foundUser.role);
+      localStorage.setItem('city_master_role', foundUser.role);
+      const roleDisplayName = foundUser.role === 'admin' ? 'Administrator (Read/Write access)' : 'Standard User (Read Only access)';
+      showNotification(`Signed in successfully as '${foundUser.username}' with ${roleDisplayName}!`, 'success');
       setAuthUsername('');
       setAuthPassword('');
     } else {
-      setAuthError('Invalid credentials. Hint: admin/admin123 or user/user123');
+      setAuthError('Invalid credentials. Check spelling, register a new account, or use preset options.');
     }
+  };
+
+  const handleRegistrationSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setRegError(null);
+    setRegSuccess(null);
+
+    const u = regUsername.trim();
+    const p = regPassword;
+    const cp = regConfirmPassword;
+
+    if (!u) {
+      setRegError('Username is required.');
+      return;
+    }
+    if (u.length < 3) {
+      setRegError('Username must be at least 3 characters.');
+      return;
+    }
+    if (p.length < 4) {
+      setRegError('Password must be at least 4 characters.');
+      return;
+    }
+    if (p !== cp) {
+      setRegError('Passwords do not match.');
+      return;
+    }
+
+    // Check if user already exists
+    const userExists = registeredUsers.some(
+      user => user.username.trim().toLowerCase() === u.toLowerCase()
+    );
+
+    if (userExists) {
+      setRegError('This username is already registered. Please login or try another.');
+      return;
+    }
+
+    // Append new user to registered list and save to localStorage
+    const newUser = {
+      username: u,
+      password: p,
+      role: regRole
+    };
+    const updatedUsers = [...registeredUsers, newUser];
+    setRegisteredUsers(updatedUsers);
+    localStorage.setItem('city_master_registered_users', JSON.stringify(updatedUsers));
+
+    setRegSuccess(`Registration successful! You can now log in with '${u}'.`);
+    
+    // Clear registration fields
+    setRegUsername('');
+    setRegPassword('');
+    setRegConfirmPassword('');
+
+    // Stagger transition back to Login to let users read success state
+    setTimeout(() => {
+      setIsRegistering(false);
+      setAuthUsername(u); // Prefill registered username for convenience
+      setRegSuccess(null);
+    }, 1500);
   };
 
   const handleLogout = () => {
@@ -394,99 +481,247 @@ export default function App() {
       )}
 
       {userRole === null ? (
-        /* GORGEOUS LOGIN SCREEN - SHOWN ONLY ON WORKSPACE START */
+        /* GORGEOUS LOGIN / REGISTRATION SCREEN - SHOWN ONLY ON WORKSPACE START */
         <div className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-3xl border border-slate-200 shadow-xl">
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-650 text-indigo-600 mb-4 shadow-sm animate-pulse">
-                <Lock className="w-8 h-8 text-indigo-600" />
-              </div>
-              <h2 className="text-2xl font-extrabold text-slate-950 font-display tracking-tight">
-                City Master Console
-              </h2>
-              <p className="text-xs text-slate-500 mt-2">
-                Sign in using standard user or administrator credentials
-              </p>
-            </div>
-
-            <form onSubmit={handleLoginSubmit} className="mt-8 space-y-5">
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                    Username
-                  </label>
-                  <input
-                    id="login-username"
-                    name="username"
-                    type="text"
-                    required
-                    value={authUsername}
-                    onChange={(e) => { setAuthUsername(e.target.value); setAuthError(null); }}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-all text-slate-900 font-medium placeholder:text-slate-400"
-                    placeholder="Enter 'admin' or 'user'"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                    Password
-                  </label>
-                  <input
-                    id="login-password"
-                    name="password"
-                    type="password"
-                    required
-                    value={authPassword}
-                    onChange={(e) => { setAuthPassword(e.target.value); setAuthError(null); }}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-all text-slate-900 font-medium font-mono placeholder:text-slate-400"
-                    placeholder="••••••••"
-                  />
-                </div>
-              </div>
-
-              {authError && (
-                <div id="login-error-box" className="p-3 bg-rose-50 border border-rose-100 text-rose-805 text-rose-800 rounded-xl text-xs font-medium flex items-start gap-2.5 animate-shake">
-                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold">Error:</span> {authError}
+          <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xl transition-all duration-300">
+            
+            {!isRegistering ? (
+              /* LOGIN FORM */
+              <div className="space-y-6">
+                <div className="text-center">
+                  <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mb-4 shadow-sm animate-pulse">
+                    <Lock className="w-8 h-8 text-indigo-600" />
                   </div>
+                  <h2 className="text-2xl font-extrabold text-slate-950 font-display tracking-tight">
+                    City Master Console
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-2">
+                    Sign in using standard user or administrator credentials
+                  </p>
                 </div>
-              )}
 
-              <button
-                type="submit"
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 rounded-xl text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <LogIn className="w-4 h-4" />
-                <span>Sign in to Console</span>
-              </button>
-            </form>
+                <form onSubmit={handleLoginSubmit} className="space-y-4">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                        Username
+                      </label>
+                      <input
+                        id="login-username"
+                        name="username"
+                        type="text"
+                        required
+                        value={authUsername}
+                        onChange={(e) => { setAuthUsername(e.target.value); setAuthError(null); }}
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-all text-slate-900 font-medium placeholder:text-slate-400"
+                        placeholder="Enter username"
+                      />
+                    </div>
 
-            <div className="pt-6 border-t border-slate-100">
-              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block text-center mb-3">
-                Preconfigured Role Presets
-              </span>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  id="prefill-admin-btn"
-                  onClick={() => handleQuickLogin('admin')}
-                  className="flex flex-col items-center justify-center p-3.5 bg-slate-50 hover:bg-amber-50/70 border border-slate-200 rounded-xl transition-all cursor-pointer group text-left w-full"
-                >
-                  <Shield className="w-5 h-5 text-amber-500 group-hover:scale-110 transition-transform mb-1.5" />
-                  <span className="font-extrabold text-slate-800 text-xs block text-center">Administrator</span>
-                  <span className="text-[9px] text-slate-400 block text-center mt-1 font-mono">admin / admin123</span>
-                </button>
-                <button
-                  id="prefill-user-btn"
-                  onClick={() => handleQuickLogin('user')}
-                  className="flex flex-col items-center justify-center p-3.5 bg-slate-50 hover:bg-indigo-50/70 border border-slate-200 rounded-xl transition-all cursor-pointer group text-left w-full"
-                >
-                  <Users className="w-5 h-5 text-indigo-500 group-hover:scale-110 transition-transform mb-1.5" />
-                  <span className="font-extrabold text-slate-800 text-xs block text-center">Standard User</span>
-                  <span className="text-[9px] text-slate-400 block text-center mt-1 font-mono">user / user123</span>
-                </button>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                        Password
+                      </label>
+                      <input
+                        id="login-password"
+                        name="password"
+                        type="password"
+                        required
+                        value={authPassword}
+                        onChange={(e) => { setAuthPassword(e.target.value); setAuthError(null); }}
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-all text-slate-900 font-medium font-mono placeholder:text-slate-400"
+                        placeholder="••••••••"
+                      />
+                    </div>
+                  </div>
+
+                  {authError && (
+                    <div id="login-error-box" className="p-3 bg-rose-50 border border-rose-100 text-rose-800 rounded-xl text-xs font-medium flex items-start gap-2.5 animate-shake">
+                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold">Error:</span> {authError}
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 rounded-xl text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    <span>Sign in to Console</span>
+                  </button>
+                </form>
+
+                {/* Trigger to swap to Registration */}
+                <div className="text-center pt-2">
+                  <p className="text-xs text-slate-500">
+                    Don't have an account?{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRegistering(true);
+                        setAuthError(null);
+                      }}
+                      className="text-indigo-600 hover:text-indigo-700 font-bold hover:underline transition-all cursor-pointer bg-transparent border-none"
+                    >
+                      Register New User
+                    </button>
+                  </p>
+                </div>
+
+
               </div>
-            </div>
+            ) : (
+              /* REGISTRATION FORM */
+              <div className="space-y-6">
+                <div className="text-center">
+                  <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mb-4 shadow-sm">
+                    <UserPlus className="w-8 h-8 text-indigo-600" />
+                  </div>
+                  <h2 className="text-2xl font-extrabold text-slate-950 font-display tracking-tight">
+                    Create Console User
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-2">
+                    Register a new account to manage the city repository
+                  </p>
+                </div>
+
+                <form onSubmit={handleRegistrationSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                      Desired Username
+                    </label>
+                    <input
+                      id="reg-username"
+                      name="regUsername"
+                      type="text"
+                      required
+                      value={regUsername}
+                      onChange={(e) => { setRegUsername(e.target.value); setRegError(null); }}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-all text-slate-900 font-medium placeholder:text-slate-400"
+                      placeholder="e.g. janesmith32"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                        Password
+                      </label>
+                      <input
+                        id="reg-password"
+                        name="regPassword"
+                        type="password"
+                        required
+                        value={regPassword}
+                        onChange={(e) => { setRegPassword(e.target.value); setRegError(null); }}
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-all text-slate-900 font-medium font-mono placeholder:text-slate-400"
+                        placeholder="••••••••"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                        Confirm
+                      </label>
+                      <input
+                        id="reg-confirm-password"
+                        name="regConfirmPassword"
+                        type="password"
+                        required
+                        value={regConfirmPassword}
+                        onChange={(e) => { setRegConfirmPassword(e.target.value); setRegError(null); }}
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-all text-slate-900 font-medium font-mono placeholder:text-slate-400"
+                        placeholder="••••••••"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Role selection tab/radio list */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                      Assign Console Role
+                    </label>
+                    <div className="grid grid-cols-2 gap-3 p-1 bg-slate-100 rounded-xl border border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => setRegRole('user')}
+                        className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          regRole === 'user' 
+                            ? 'bg-indigo-600 text-white shadow' 
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50/50'
+                        }`}
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                        <span>Standard User (R-O)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRegRole('admin')}
+                        className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          regRole === 'admin' 
+                            ? 'bg-indigo-600 text-white shadow' 
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50/50'
+                        }`}
+                      >
+                        <Shield className="w-3.5 h-3.5" />
+                        <span>Administrator (R/W)</span>
+                      </button>
+                    </div>
+                    <span className="text-[10px] text-slate-400 block mt-1 px-1">
+                      {regRole === 'admin' 
+                        ? 'Full clearance to create, update, and delete repository entries.' 
+                        : 'Access restricted to querying, searching, and sorting records.'}
+                    </span>
+                  </div>
+
+                  {regError && (
+                    <div id="reg-error-box" className="p-3 bg-rose-50 border border-rose-100 text-rose-800 rounded-xl text-xs font-medium flex items-start gap-2.5 animate-shake">
+                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold">Error:</span> {regError}
+                      </div>
+                    </div>
+                  )}
+
+                  {regSuccess && (
+                    <div id="reg-success-box" className="p-3 bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-xl text-xs font-medium flex items-start gap-2.5">
+                      <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      <div>
+                        {regSuccess}
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3.5 rounded-xl text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    <span>Create User Account</span>
+                  </button>
+                </form>
+
+                {/* Back to Login toggler */}
+                <div className="text-center pt-2">
+                  <p className="text-xs text-slate-500">
+                    Already have an account?{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRegistering(false);
+                        setRegError(null);
+                        setRegSuccess(null);
+                      }}
+                      className="text-indigo-600 hover:text-indigo-700 font-bold hover:underline transition-all cursor-pointer bg-transparent border-none"
+                    >
+                      Back to Sign In
+                    </button>
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       ) : (
